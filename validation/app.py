@@ -10,7 +10,7 @@ users = {
     'jane.smith@example.com': 'SecureP@ss1'
 }
 
-@app.route('/signup', methods=['GET', 'POST'])
+@app.route('/signup', methods=['POST'])
 def signup():
     if request.method == 'POST':
         print("POST request received for signup")
@@ -62,7 +62,7 @@ def signup():
 
     return render_template('signup.html')
 
-@app.route('/merchant_signup', methods=['GET', 'POST'])
+@app.route('/merchant_signup', methods=['POST'])
 def merchant_signup():
     if request.method == 'POST':
         print("POST request received for merchant signup")
@@ -189,7 +189,7 @@ def merchant_signup():
 
     return render_template('merchant_signup.html')
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['POST'])
 def login():
     if request.method == 'POST':
         print("POST request received for login")
