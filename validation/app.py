@@ -83,7 +83,7 @@ def merchant_signup():
         agree_terms = request.form.get('agreeTerms')
 
         # Validate business name
-        if not business_name:
+        if not business_name or len(business_name)<4:
             flash('Business name is required.', 'error')
             return render_template('merchant_signup.html', business_name=business_name, contact_person_name=contact_person_name,
                                    username=username, email=email, phone=phone, bank_name=bank_name, account_number=account_number,
