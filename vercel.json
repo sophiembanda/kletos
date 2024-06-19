@@ -1,9 +1,24 @@
 {
     "version": 2,
     "builds": [
-        {"src": "app.py", "use": "@vercel/python"}
+      {
+        "src": "homepage_endpoints/app.py",
+        "use": "@vercel/python"
+      },
+      {
+        "src": "validation/app.py",
+        "use": "@vercel/python"
+      }
     ],
     "routes": [
-        {"src": "/(.*)", "dest": "app.py"}
+      {
+        "src": "/homepage_endpoints/(.*)",
+        "dest": "homepage_endpoints/app.py"
+      },
+      {
+        "src": "/validation/(.*)",
+        "dest": "validation/app.py"
+      }
     ]
-}
+  }
+  
