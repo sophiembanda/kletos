@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 app = Flask(__name__)
 
@@ -13,7 +15,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 jwt = JWTManager(app)
 db = SQLAlchemy(app)
 
-# Define the Product model
+# Product model
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -21,7 +23,7 @@ class Product(db.Model):
     image = db.Column(db.String(255), nullable=False)
     price = db.Column(db.Float, nullable=False)
 
-# Define the Cart and CartItem models
+# Cart and CartItem models
 class Cart(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     total_price = db.Column(db.Float, default=0.0)
@@ -35,11 +37,21 @@ class CartItem(db.Model):
     cart = db.relationship('Cart', backref=db.backref('items', lazy=True))
     product = db.relationship('Product', backref=db.backref('items', lazy=True))
 
+# User model
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    phone_number = db.Column(db.String(20), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
 # Create the database and tables
 with app.app_context():
     db.create_all()
 
-# Sample data (optional)
+# Sample data
 with app.app_context():
     if not Product.query.first():
         sample_products = [
@@ -48,6 +60,63 @@ with app.app_context():
         ]
         db.session.bulk_save_objects(sample_products)
         db.session.commit()
+
+# Function to validate input
+def validate_input(email_or_phone, password):
+    if not email_or_phone or not password:
+        return False, "Email or phone and password are required."
+    return True, "Valid input"
+
+# Function to generate token
+def generate_token(user_id):
+    return create_access_token(identity=user_id)
+
+# Register Endpoint
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    email = data.get('email')
+    phone_number = data.get('phone_number')
+    password = data.get('password')
+
+    # Validate input
+    if not email or not phone_number or not password:
+        return jsonify({'error': 'Email, phone number, and password are required'}), 400
+
+    # Check if user already exists
+    if User.query.filter((User.email == email) | (User.phone_number == phone_number)).first():
+        return jsonify({'error': 'User already exists'}), 400
+
+    # Hash the password
+    password_hash = generate_password_hash(password)
+
+    # Create new user
+    new_user = User(email=email, phone_number=phone_number, password_hash=password_hash)
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({'message': 'User registered successfully'}), 201
+
+# Login Endpoint
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email_or_phone = data.get('email_or_phone')
+    password = data.get('password')
+
+    # Validate input
+    if not email_or_phone or not password:
+        return jsonify({'error': 'Email or phone and password are required'}), 400
+
+    # Find user by email or phone number
+    user = User.query.filter((User.email == email_or_phone) | (User.phone_number == email_or_phone)).first()
+
+    # Check if user exists and password is correct
+    if user and user.check_password(password):
+        token = generate_token(user.id)
+        return jsonify({'token': token}), 200
+
+    return jsonify({'error': 'Invalid credentials'}), 401
 
 # Navigation Bar Endpoints
 @app.route('/home', methods=['GET'])
@@ -79,40 +148,19 @@ def contact():
 @app.route('/profile', methods=['GET'])
 @jwt_required()
 def profile():
-    current_user = get_jwt_identity()
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
     user_profile = {
-        "id": 1,
-        "name": "John Doe",
-        "email": current_user
+        "id": user.id,
+        "email": user.email,
+        "phone_number": user.phone_number
     }
     return jsonify({"user": user_profile})
 
-@app.route('/sign-in', methods=['POST'])
-def sign_in():
-    data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
-    # Mock sign-in logic
-    if email == "john.doe@example.com" and password == "password123":
-        access_token = create_access_token(identity=email)
-        return jsonify({"message": "User signed in", "token": access_token})
-    else:
-        return jsonify({"message": "Invalid credentials"}), 401
-
 @app.route('/sign-out', methods=['POST'])
 def sign_out():
+    # Perform sign-out logic here
     return jsonify({"message": "User signed out"})
-
-# Hero Section Endpoint
-@app.route('/hero-content', methods=['GET'])
-def hero_content():
-    hero = {
-        "image": "banner_image_url",
-        "text": "Kletos: Jewelry for Every Chapter",
-        "button_text": "Learn More",
-        "button_link": "/learn-more"
-    }
-    return jsonify({"hero": hero})
 
 # Category Navigation Endpoints
 @app.route('/categories', methods=['GET'])
@@ -136,19 +184,6 @@ def get_products_by_category():
     return jsonify({"products": filtered_products, "category": category_name})
 
 # Featured Products Endpoint
-@app.route('/featured-products', methods=['GET'])
-def get_featured_products():
-    # Mock featured products
-    featured_products = [
-        {
-            "id": 1,
-            "name": "Featured Product 1",
-            "image": "image_url",
-            "price": 120.0
-        },
-    ]
-    return jsonify({"featured_products": featured_products})
-
 @app.route('/product/<int:product_id>', methods=['GET'])
 def get_product(product_id):
     product = Product.query.get_or_404(product_id)
@@ -172,23 +207,6 @@ def get_highlighted_product():
         "price": 150.0
     }
     return jsonify({"highlighted_product": highlighted_product})
-
-# Footer Endpoint
-@app.route('/footer-content', methods=['GET'])
-def footer_content():
-    footer_content = {
-        "about": "Find pieces that shimmer and radiate confidence just like you.",
-        "links": [
-            {"name": "Home", "url": "/home"},
-            {"name": "Products", "url": "/products"},
-        ],
-        "contact": {
-            "email": "support@kletos.com",
-            "phone": "+1234567890",
-            "address": "1234 Kletos St Jewelry City 56789"
-        }
-    }
-    return jsonify({"footer": footer_content})
 
 # Cart Management Endpoints
 @app.route('/cart/add', methods=['POST'])

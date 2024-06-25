@@ -25,7 +25,7 @@ class Product(db.Model):
 with app.app_context():
     db.create_all()
 
-# Sample data (optional)
+# Sample data 
 with app.app_context():
     sample_products = [
         Product(name="Product 1", category="Necklace", image="image_url", price=100.0),
