@@ -33,7 +33,7 @@ with get_db_connection() as conn:
                      preferred_payment_methods TEXT,
                      business_license BLOB,
                      id_image BLOB,
-                     agree_terms TEXT
+                     agree_terms BOOLEAN
                      )''')
 
 # Function to validate email format
@@ -97,7 +97,7 @@ def merchant_signup():
         return jsonify({'error': 'No data received'}), 400
 
     business_name = data.get('businessName')
-    # contact_person_name = data.get('contactPersonName')
+    contact_person_name = data.get('contactPersonName')
     username = data.get('username')
     password = data.get('password')
     confirm_password = data.get('confirmPassword')
@@ -107,15 +107,15 @@ def merchant_signup():
     account_number = data.get('accountNumber')
     preferred_payment_methods = data.get('preferredPaymentMethods')
     business_license = data.get('businessLicense')
-    id_proof = data.get('idProof')
+    id_image= data.get('id_image')
     agree_terms = data.get('agreeTerms')
 
     # Validate inputs
     if not business_name or len(business_name) < 4:
         return jsonify({'error': 'Business name is required and must be at least 4 characters long'}), 400
 
-    # if not contact_person_name:
-    #     return jsonify({'error': 'Contact person name is required'}), 400
+    if not contact_person_name:
+        return jsonify({'error': 'Contact person name is required'}), 400
 
     if not username or len(username) < 4:
         return jsonify({'error': 'Username must be at least 4 characters long'}), 400
@@ -144,17 +144,19 @@ def merchant_signup():
     if not business_license:
         return jsonify({'error': 'Business license is required'}), 400
 
-    if not id_proof:
+    if not id_image:
         return jsonify({'error': 'ID proof is required'}), 400
 
-    if not agree_terms:
-        return jsonify({'error': 'You must agree to the terms and conditions'}), 400
+    if agree_terms not in ['yes', 'no']:
+        return jsonify({'error': 'You must agree to the terms and conditions with yes or no'}), 400
+
+    agree_terms_bool = True if agree_terms == 'yes' else False
 
     # Insert merchant into database
     try:
         with get_db_connection() as conn:
-            conn.execute("INSERT INTO merchants (business_name, contact_person_name, username, email, password, phone, bank_name, account_number, preferred_payment_methods, business_license, id_proof, agree_terms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                         (business_name, username, email, password, phone, bank_name, account_number, preferred_payment_methods, business_license, id_proof, agree_terms))
+            conn.execute("INSERT INTO merchants (business_name, contact_person_name, username, email, password, phone, bank_name, account_number, preferred_payment_methods, business_license, id_image, agree_terms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                         (business_name, contact_person_name, username, email, password, phone, bank_name, account_number, preferred_payment_methods, business_license, id_image, agree_terms))
             conn.commit()
     except sqlite3.IntegrityError as e:
         return jsonify({'error': 'Merchant with this email or username already exists'}), 400
